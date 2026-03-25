@@ -2,6 +2,14 @@
 
 set -euo pipefail
 
+# install only if NOT already installed
+if ! pip freeze | grep -q '^runme=='; then
+  pip install -e .[build]
+fi
+
+pyinstaller runme-desktop.spec
+
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIST_PATH="$ROOT_DIR/dist/RunMe"
 INSTALL_DIR="${HOME}/.local/opt/runme"

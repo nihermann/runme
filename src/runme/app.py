@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 import tkinter as tk
+import tkinter.font as tkfont
 from datetime import datetime
 from dataclasses import replace
 from pathlib import Path
@@ -42,10 +43,17 @@ def icon_path() -> Path:
 
 
 class Tooltip:
-    def __init__(self, widget: tk.Widget, text: str, delay_ms: int = 700) -> None:
+    def __init__(
+        self,
+        widget: tk.Widget,
+        text: str,
+        delay_ms: int = 700,
+        font: Optional[Tuple[object, ...]] = None,
+    ) -> None:
         self.widget = widget
         self.text = text
         self.delay_ms = delay_ms
+        self.font = font or ("TkDefaultFont", 10)
         self.tip_window: Optional[tk.Toplevel] = None
         self.after_id: Optional[str] = None
 
@@ -77,7 +85,7 @@ class Tooltip:
             bd=1,
             padx=8,
             pady=4,
-            font=("Helvetica", 10),
+            font=self.font,
         )
         label.pack()
 
@@ -175,8 +183,9 @@ class IconButton(tk.Canvas):
 
 
 class OutputManager:
-    def __init__(self, root: tk.Tk) -> None:
+    def __init__(self, root: tk.Tk, fonts: Dict[str, Tuple[object, ...]]) -> None:
         self.root = root
+        self.fonts = fonts
         self.contents: Dict[str, str] = {}
         self.windows: Dict[str, tk.Toplevel] = {}
         self.text_widgets: Dict[str, tk.Text] = {}
@@ -215,7 +224,7 @@ class OutputManager:
             fg=TEXT,
             insertbackground=TEXT,
             relief="flat",
-            font=("Menlo", 12),
+            font=self.fonts["mono_body"],
             padx=16,
             pady=16,
         )
@@ -343,12 +352,14 @@ class CommandEditor(tk.Toplevel):
         storage: Storage,
         category: Category,
         command: Optional[Command],
+        fonts: Dict[str, Tuple[object, ...]],
         on_save: Callable[[Category, Command, str], None],
     ) -> None:
         super().__init__(master)
         self.storage = storage
         self.category = category
         self.command = command
+        self.fonts = fonts
         self.on_save = on_save
         self.title("Edit Command" if command else "Add Command")
         self.geometry("860x680")
@@ -361,13 +372,13 @@ class CommandEditor(tk.Toplevel):
         header = tk.Frame(self, bg=BG)
         header.grid(row=0, column=0, sticky="ew", padx=24, pady=(24, 12))
 
-        tk.Label(header, text="Command", bg=BG, fg=TEXT, font=("Helvetica", 22, "bold")).pack(anchor="w")
+        tk.Label(header, text="Command", bg=BG, fg=TEXT, font=self.fonts["editor_title"]).pack(anchor="w")
         tk.Label(
             header,
             text="Edit the shell script, choose a working directory, and decide whether it should open in a new terminal.",
             bg=BG,
             fg=MUTED,
-            font=("Helvetica", 11),
+            font=self.fonts["body"],
         ).pack(anchor="w", pady=(6, 0))
 
         form = tk.Frame(self, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
@@ -401,7 +412,7 @@ class CommandEditor(tk.Toplevel):
             padx=12,
             pady=10,
             cursor=CLICK_CURSOR,
-            font=("Helvetica", 11),
+            font=self.fonts["body"],
         )
         self.terminal_toggle.grid(row=4, column=0, sticky="ew", padx=18, pady=(18, 8))
 
@@ -412,7 +423,7 @@ class CommandEditor(tk.Toplevel):
             fg=TEXT,
             insertbackground=TEXT,
             relief="flat",
-            font=("Menlo", 12),
+            font=self.fonts["mono_body"],
             padx=14,
             pady=14,
         )
@@ -433,7 +444,7 @@ class CommandEditor(tk.Toplevel):
         name_entry.focus_set()
 
     def _field(self, parent: tk.Widget, label: str, row: int) -> None:
-        tk.Label(parent, text=label, bg=PANEL, fg=MUTED, font=("Helvetica", 10, "bold")).grid(
+        tk.Label(parent, text=label, bg=PANEL, fg=MUTED, font=self.fonts["field_label"]).grid(
             row=row,
             column=0,
             sticky="w",
@@ -485,9 +496,10 @@ class RunMeApp:
         self.card_columns = 1
         self.card_width = 260
 
+        self.fonts = self._build_fonts()
         self._configure_style()
         self._configure_icon()
-        self.output_manager = OutputManager(root)
+        self.output_manager = OutputManager(root, self.fonts)
         self.runner = CommandRunner(root, self.output_manager, self._set_status)
 
         self._build_shell()
@@ -497,15 +509,101 @@ class RunMeApp:
         style = ttk.Style()
         style.theme_use("clam")
         style.configure("TFrame", background=BG)
-        style.configure("TLabel", background=BG, foreground=TEXT)
-        style.configure("TButton", background=ACCENT_DARK, foreground=TEXT, borderwidth=0, padding=10)
+        style.configure("TLabel", background=BG, foreground=TEXT, font=self.fonts["body"])
+        style.configure("TButton", background=ACCENT_DARK, foreground=TEXT, borderwidth=0, padding=10, font=self.fonts["button"])
         style.map("TButton", background=[("active", "#2a7c6b")])
-        style.configure("Secondary.TButton", background=CARD_ALT, foreground=TEXT)
+        style.configure("Secondary.TButton", background=CARD_ALT, foreground=TEXT, font=self.fonts["button"])
         style.map("Secondary.TButton", background=[("active", "#313841")])
-        style.configure("Danger.TButton", background="#6f2c2c", foreground=TEXT)
+        style.configure("Danger.TButton", background="#6f2c2c", foreground=TEXT, font=self.fonts["button"])
         style.map("Danger.TButton", background=[("active", "#8f3b3b")])
-        style.configure("TEntry", fieldbackground="#0c0f12", foreground=TEXT, bordercolor=BORDER)
-        style.configure("TCheckbutton", background=PANEL, foreground=TEXT)
+        style.configure("TEntry", fieldbackground="#0c0f12", foreground=TEXT, bordercolor=BORDER, font=self.fonts["body"])
+        style.configure("TCheckbutton", background=PANEL, foreground=TEXT, font=self.fonts["body"])
+
+    def _build_fonts(self) -> Dict[str, Tuple[object, ...]]:
+        system = platform.system()
+        default_font = tkfont.nametofont("TkDefaultFont")
+        fixed_font = tkfont.nametofont("TkFixedFont")
+
+        if system == "Darwin":
+            ui_candidates = ["Helvetica"]
+            mono_candidates = ["Menlo", "Monaco"]
+            sizes = {
+                "tooltip": 10,
+                "mono_body": 12,
+                "editor_title": 22,
+                "body": 11,
+                "field_label": 10,
+                "button": 11,
+                "hero_title": 28,
+                "hero_subtitle": 12,
+                "section_title": 20,
+                "empty_state": 12,
+                "card_title": 13,
+                "card_meta": 10,
+                "card_caption": 9,
+            }
+        elif system == "Linux":
+            ui_candidates = ["Inter", "Noto Sans", "Roboto", "Cantarell", "Ubuntu", "Arial"]
+            mono_candidates = ["JetBrains Mono", "IBM Plex Mono", "Fira Code", "Source Code Pro", "DejaVu Sans Mono"]
+            sizes = {
+                "tooltip": 9,
+                "mono_body": 11,
+                "editor_title": 21,
+                "body": 10,
+                "field_label": 9,
+                "button": 10,
+                "hero_title": 26,
+                "hero_subtitle": 11,
+                "section_title": 19,
+                "empty_state": 11,
+                "card_title": 12,
+                "card_meta": 9,
+                "card_caption": 8,
+            }
+        else:
+            ui_candidates = ["Segoe UI", "Arial", "Helvetica"]
+            mono_candidates = ["Cascadia Mono", "Consolas", "Courier New"]
+            sizes = {
+                "tooltip": 10,
+                "mono_body": 12,
+                "editor_title": 22,
+                "body": 11,
+                "field_label": 10,
+                "button": 11,
+                "hero_title": 28,
+                "hero_subtitle": 12,
+                "section_title": 20,
+                "empty_state": 12,
+                "card_title": 13,
+                "card_meta": 10,
+                "card_caption": 9,
+            }
+
+        ui_family = self._pick_font_family(ui_candidates, str(default_font.cget("family")))
+        mono_family = self._pick_font_family(mono_candidates, str(fixed_font.cget("family")))
+        return {
+            "tooltip": (ui_family, sizes["tooltip"]),
+            "mono_body": (mono_family, sizes["mono_body"]),
+            "editor_title": (ui_family, sizes["editor_title"], "bold"),
+            "body": (ui_family, sizes["body"]),
+            "field_label": (ui_family, sizes["field_label"], "bold"),
+            "button": (ui_family, sizes["button"]),
+            "hero_title": (ui_family, sizes["hero_title"], "bold"),
+            "hero_subtitle": (ui_family, sizes["hero_subtitle"]),
+            "section_title": (ui_family, sizes["section_title"], "bold"),
+            "empty_state": (ui_family, sizes["empty_state"]),
+            "card_title": (ui_family, sizes["card_title"], "bold"),
+            "card_meta": (ui_family, sizes["card_meta"]),
+            "card_caption": (ui_family, sizes["card_caption"]),
+        }
+
+    def _pick_font_family(self, candidates: list[str], fallback: str) -> str:
+        available = {family.casefold(): family for family in tkfont.families(self.root)}
+        for candidate in candidates:
+            match = available.get(candidate.casefold())
+            if match:
+                return match
+        return fallback
 
     def _configure_icon(self) -> None:
         path = icon_path()
@@ -521,13 +619,13 @@ class RunMeApp:
         top = tk.Frame(self.root, bg=BG)
         top.pack(fill="x", padx=24, pady=(20, 12))
 
-        tk.Label(top, text="RunMe", bg=BG, fg=TEXT, font=("Helvetica", 28, "bold")).pack(anchor="w")
+        tk.Label(top, text="RunMe", bg=BG, fg=TEXT, font=self.fonts["hero_title"]).pack(anchor="w")
         tk.Label(
             top,
             text="Launch saved shell scripts without opening a terminal first.",
             bg=BG,
             fg=MUTED,
-            font=("Helvetica", 12),
+            font=self.fonts["hero_subtitle"],
         ).pack(anchor="w", pady=(6, 0))
 
         actions = tk.Frame(self.root, bg=BG)
@@ -574,7 +672,7 @@ class RunMeApp:
                 text="No categories yet. Create one to start adding commands.",
                 bg=PANEL,
                 fg=MUTED,
-                font=("Helvetica", 12),
+                font=self.fonts["empty_state"],
                 padx=20,
                 pady=20,
             ).pack(anchor="w")
@@ -590,7 +688,7 @@ class RunMeApp:
         header = tk.Frame(section, bg=BG)
         header.pack(fill="x", pady=(0, 14))
 
-        tk.Label(header, text=category.name, bg=BG, fg=TEXT, font=("Helvetica", 20, "bold")).pack(side="left")
+        tk.Label(header, text=category.name, bg=BG, fg=TEXT, font=self.fonts["section_title"]).pack(side="left")
         line = tk.Frame(header, bg=BORDER, height=1)
         line.pack(side="left", fill="x", expand=True, padx=16, pady=(15, 0))
         add_button = ttk.Button(
@@ -613,7 +711,7 @@ class RunMeApp:
                 text="No commands in this category yet.",
                 bg=PANEL,
                 fg=MUTED,
-                font=("Helvetica", 11),
+                font=self.fonts["body"],
                 padx=18,
                 pady=18,
             ).pack(anchor="w")
@@ -655,18 +753,18 @@ class RunMeApp:
             height=36,
         )
         play.pack(side="left")
-        Tooltip(play, "Run command")
+        Tooltip(play, "Run command", font=self.fonts["tooltip"])
 
         text_block = tk.Frame(top, bg=parent["bg"])
         text_block.pack(side="left", fill="x", expand=True, padx=(10, 0))
 
-        tk.Label(text_block, text=command.name, bg=parent["bg"], fg=TEXT, font=("Helvetica", 13, "bold")).pack(anchor="w")
+        tk.Label(text_block, text=command.name, bg=parent["bg"], fg=TEXT, font=self.fonts["card_title"]).pack(anchor="w")
         tk.Label(
             text_block,
             text=Path(command.working_directory).expanduser(),
             bg=parent["bg"],
             fg=MUTED,
-            font=("Helvetica", 9),
+            font=self.fonts["card_caption"],
             wraplength=max(120, self.card_width - 92),
             anchor="w",
             justify="left",
@@ -677,13 +775,13 @@ class RunMeApp:
 
         status_var = tk.StringVar(value="Idle")
         self.status_vars[command.id] = status_var
-        tk.Label(meta, textvariable=status_var, bg=parent["bg"], fg=ACCENT, font=("Helvetica", 10)).pack(side="left")
+        tk.Label(meta, textvariable=status_var, bg=parent["bg"], fg=ACCENT, font=self.fonts["card_meta"]).pack(side="left")
         terminal_label = "Terminal" if command.open_in_terminal else "Inline"
-        tk.Label(meta, text=terminal_label, bg=parent["bg"], fg=MUTED, font=("Helvetica", 9)).pack(side="right")
+        tk.Label(meta, text=terminal_label, bg=parent["bg"], fg=MUTED, font=self.fonts["card_caption"]).pack(side="right")
 
         last_run_var = tk.StringVar(value=self._format_last_run(command))
         self.last_run_vars[command.id] = last_run_var
-        tk.Label(parent, textvariable=last_run_var, bg=parent["bg"], fg=MUTED, font=("Helvetica", 9)).pack(
+        tk.Label(parent, textvariable=last_run_var, bg=parent["bg"], fg=MUTED, font=self.fonts["card_caption"]).pack(
             anchor="w",
             padx=14,
             pady=(0, 10),
@@ -716,10 +814,14 @@ class RunMeApp:
         )
         delete_button.pack(side="right", padx=3)
 
-        Tooltip(edit_button, "Edit command")
-        Tooltip(clone_button, "Clone command")
-        Tooltip(output_button, "View output" if not command.open_in_terminal else "Output unavailable for terminal mode")
-        Tooltip(delete_button, "Delete command")
+        Tooltip(edit_button, "Edit command", font=self.fonts["tooltip"])
+        Tooltip(clone_button, "Clone command", font=self.fonts["tooltip"])
+        Tooltip(
+            output_button,
+            "View output" if not command.open_in_terminal else "Output unavailable for terminal mode",
+            font=self.fonts["tooltip"],
+        )
+        Tooltip(delete_button, "Delete command", font=self.fonts["tooltip"])
 
     def _icon_button(
         self,
@@ -805,7 +907,7 @@ class RunMeApp:
         self._persist_and_render()
 
     def open_editor(self, category: Category, command: Optional[Command]) -> None:
-        CommandEditor(self.root, self.storage, category, command, self.save_command)
+        CommandEditor(self.root, self.storage, category, command, self.fonts, self.save_command)
 
     def save_command(self, category: Category, command: Command, _: str) -> None:
         existing = next((index for index, item in enumerate(category.commands) if item.id == command.id), None)
