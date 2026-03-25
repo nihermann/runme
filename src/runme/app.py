@@ -41,12 +41,6 @@ def icon_path() -> Path:
     return Path(__file__).resolve().parent / "data" / "icon.png"
 
 
-def action_symbol(name: str) -> str:
-    if platform.system() == "Linux":
-        return {"run": "R", "edit": "E", "clone": "C", "output": "O", "delete": "X"}.get(name, "?")
-    return {"run": "▶", "edit": "✎", "clone": "⧉", "output": "⌁", "delete": "✕"}.get(name, "?")
-
-
 class Tooltip:
     def __init__(self, widget: tk.Widget, text: str, delay_ms: int = 700) -> None:
         self.widget = widget
@@ -97,6 +91,87 @@ class Tooltip:
         if self.after_id is not None:
             self.widget.after_cancel(self.after_id)
             self.after_id = None
+
+
+class IconButton(tk.Canvas):
+    def __init__(
+        self,
+        parent: tk.Widget,
+        icon_name: str,
+        command: Callable[[], None],
+        *,
+        bg_color: str,
+        fg_color: str,
+        active_bg: str,
+        disabled: bool = False,
+        width: int = 34,
+        height: int = 34,
+    ) -> None:
+        super().__init__(
+            parent,
+            width=width,
+            height=height,
+            bg=parent.cget("bg"),
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+            cursor=CLICK_CURSOR if not disabled else "arrow",
+        )
+        self.icon_name = icon_name
+        self.command = command
+        self.normal_bg = bg_color
+        self.active_bg = active_bg
+        self.fg_color = fg_color
+        self.disabled = disabled
+        self.button_width = width
+        self.button_height = height
+
+        self._draw(bg_color)
+        if not disabled:
+            self.bind("<Button-1>", self._on_click)
+            self.bind("<Enter>", lambda _: self._draw(self.active_bg), add="+")
+            self.bind("<Leave>", lambda _: self._draw(self.normal_bg), add="+")
+
+    def _on_click(self, _: tk.Event) -> None:
+        self.command()
+
+    def _draw(self, fill: str) -> None:
+        self.delete("all")
+        self.create_rectangle(
+            1,
+            1,
+            self.button_width - 1,
+            self.button_height - 1,
+            fill=fill,
+            outline="#334155" if not self.disabled else fill,
+            width=1,
+        )
+        draw_fn = getattr(self, f"_draw_{self.icon_name}", None)
+        if draw_fn:
+            draw_fn()
+
+    def _draw_run(self) -> None:
+        self.create_polygon(12, 9, 12, 25, 25, 17, fill=self.fg_color, outline=self.fg_color)
+
+    def _draw_edit(self) -> None:
+        self.create_polygon(11, 21, 14, 24, 24, 14, 21, 11, fill=self.fg_color, outline=self.fg_color)
+        self.create_polygon(21, 11, 24, 14, 26, 12, 23, 9, fill=self.fg_color, outline=self.fg_color)
+        self.create_polygon(11, 21, 10, 26, 15, 25, fill=self.fg_color, outline=self.fg_color)
+        self.create_line(12, 22, 23, 11, fill=self.normal_bg, width=1)
+
+    def _draw_clone(self) -> None:
+        self.create_rectangle(9, 12, 20, 23, outline=self.fg_color, width=2)
+        self.create_rectangle(14, 10, 25, 21, outline=self.fg_color, width=2)
+
+    def _draw_output(self) -> None:
+        self.create_rectangle(8, 9, 26, 24, outline=self.fg_color, width=2)
+        self.create_line(12, 14, 16, 17, fill=self.fg_color, width=2)
+        self.create_line(12, 20, 16, 17, fill=self.fg_color, width=2)
+        self.create_line(19, 20, 23, 20, fill=self.fg_color, width=2)
+
+    def _draw_delete(self) -> None:
+        self.create_line(11, 11, 23, 23, fill=self.fg_color, width=3)
+        self.create_line(23, 11, 11, 23, fill=self.fg_color, width=3)
 
 
 class OutputManager:
@@ -569,19 +644,15 @@ class RunMeApp:
         top = tk.Frame(parent, bg=parent["bg"])
         top.pack(fill="x", padx=14, pady=(14, 8))
 
-        play = tk.Button(
+        play = IconButton(
             top,
-            text=action_symbol("run"),
-            bg=ACCENT,
-            fg="#06261d",
-            font=("Helvetica", 16, "bold"),
-            relief="flat",
-            width=3,
-            height=1,
-            command=lambda cmd=command: self.run_command(cmd),
-            cursor=CLICK_CURSOR,
-            activebackground="#90f3cd",
-            activeforeground="#06261d",
+            "run",
+            lambda cmd=command: self.run_command(cmd),
+            bg_color=ACCENT,
+            fg_color="#06261d",
+            active_bg="#90f3cd",
+            width=36,
+            height=36,
         )
         play.pack(side="left")
         Tooltip(play, "Run command")
@@ -621,15 +692,15 @@ class RunMeApp:
         actions = tk.Frame(parent, bg=parent["bg"])
         actions.pack(fill="x", padx=12, pady=(0, 14))
 
-        edit_button = self._icon_button(actions, action_symbol("edit"), lambda cat=category, cmd=command: self.open_editor(cat, cmd), "Edit")
+        edit_button = self._icon_button(actions, "edit", lambda cat=category, cmd=command: self.open_editor(cat, cmd), "Edit")
         edit_button.pack(side="left", padx=3)
 
-        clone_button = self._icon_button(actions, action_symbol("clone"), lambda cat=category, cmd=command: self.clone_command(cat, cmd), "Clone")
+        clone_button = self._icon_button(actions, "clone", lambda cat=category, cmd=command: self.clone_command(cat, cmd), "Clone")
         clone_button.pack(side="left", padx=3)
 
         output_button = self._icon_button(
             actions,
-            action_symbol("output"),
+            "output",
             lambda cmd=command: self.output_manager.show(cmd),
             "Output",
             disabled=command.open_in_terminal,
@@ -638,7 +709,7 @@ class RunMeApp:
 
         delete_button = self._icon_button(
             actions,
-            action_symbol("delete"),
+            "delete",
             lambda cat=category, cmd=command: self.delete_command(cat, cmd),
             "Delete",
             danger=True,
@@ -653,37 +724,27 @@ class RunMeApp:
     def _icon_button(
         self,
         parent: tk.Frame,
-        symbol: str,
+        icon_name: str,
         command: Callable[[], None],
         label: str,
         danger: bool = False,
         disabled: bool = False,
-    ) -> tk.Button:
+    ) -> IconButton:
         background = "#f5d0d0" if danger else ICON_BG
         foreground = "#7f1d1d" if danger else ICON_FG
         active = "#ef4444" if danger else "#d7e2ec"
-        state = "disabled" if disabled else "normal"
         if disabled:
             background = ICON_DISABLED_BG
             foreground = ICON_DISABLED_FG
             active = ICON_DISABLED_BG
-        return tk.Button(
+        return IconButton(
             parent,
-            text=symbol,
+            icon_name,
             command=command,
-            bg=background,
-            activebackground=active,
-            fg=foreground,
-            activeforeground=foreground,
-            relief="solid",
-            bd=1,
-            state=state,
-            width=2,
-            height=1,
-            cursor=CLICK_CURSOR,
-            font=("Helvetica", 12, "bold"),
-            padx=10,
-            pady=7,
+            bg_color=background,
+            fg_color=foreground,
+            active_bg=active,
+            disabled=disabled,
         )
 
     def _on_canvas_configure(self, event: tk.Event) -> None:
