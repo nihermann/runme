@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path.cwd()
-ICON = ROOT / "src" / "runme" / "data" / "icon.png"
+ICON = ROOT / "src" / "runme" / "data" / "icon128.png"
 
 
 a = Analysis(
