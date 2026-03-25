@@ -41,6 +41,64 @@ def icon_path() -> Path:
     return Path(__file__).resolve().parent / "data" / "icon.png"
 
 
+def action_symbol(name: str) -> str:
+    if platform.system() == "Linux":
+        return {"run": "R", "edit": "E", "clone": "C", "output": "O", "delete": "X"}.get(name, "?")
+    return {"run": "▶", "edit": "✎", "clone": "⧉", "output": "⌁", "delete": "✕"}.get(name, "?")
+
+
+class Tooltip:
+    def __init__(self, widget: tk.Widget, text: str, delay_ms: int = 700) -> None:
+        self.widget = widget
+        self.text = text
+        self.delay_ms = delay_ms
+        self.tip_window: Optional[tk.Toplevel] = None
+        self.after_id: Optional[str] = None
+
+        widget.bind("<Enter>", self._schedule, add="+")
+        widget.bind("<Leave>", self._hide, add="+")
+        widget.bind("<ButtonPress>", self._hide, add="+")
+
+    def _schedule(self, _: tk.Event) -> None:
+        self._cancel()
+        self.after_id = self.widget.after(self.delay_ms, self._show)
+
+    def _show(self) -> None:
+        self.after_id = None
+        if self.tip_window is not None or not self.widget.winfo_viewable():
+            return
+        x = self.widget.winfo_rootx() + (self.widget.winfo_width() // 2) + 8
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 10
+        self.tip_window = tk.Toplevel(self.widget)
+        self.tip_window.wm_overrideredirect(True)
+        self.tip_window.configure(bg="#f8fafc")
+        self.tip_window.wm_geometry(f"+{x}+{y}")
+
+        label = tk.Label(
+            self.tip_window,
+            text=self.text,
+            bg="#f8fafc",
+            fg="#0f172a",
+            relief="solid",
+            bd=1,
+            padx=8,
+            pady=4,
+            font=("Helvetica", 10),
+        )
+        label.pack()
+
+    def _hide(self, _: Optional[tk.Event] = None) -> None:
+        self._cancel()
+        if self.tip_window is not None and self.tip_window.winfo_exists():
+            self.tip_window.destroy()
+        self.tip_window = None
+
+    def _cancel(self) -> None:
+        if self.after_id is not None:
+            self.widget.after_cancel(self.after_id)
+            self.after_id = None
+
+
 class OutputManager:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
@@ -513,7 +571,7 @@ class RunMeApp:
 
         play = tk.Button(
             top,
-            text="▶",
+            text=action_symbol("run"),
             bg=ACCENT,
             fg="#06261d",
             font=("Helvetica", 16, "bold"),
@@ -526,6 +584,7 @@ class RunMeApp:
             activeforeground="#06261d",
         )
         play.pack(side="left")
+        Tooltip(play, "Run command")
 
         text_block = tk.Frame(top, bg=parent["bg"])
         text_block.pack(side="left", fill="x", expand=True, padx=(10, 0))
@@ -562,26 +621,34 @@ class RunMeApp:
         actions = tk.Frame(parent, bg=parent["bg"])
         actions.pack(fill="x", padx=12, pady=(0, 14))
 
-        self._icon_button(actions, "✎", lambda cat=category, cmd=command: self.open_editor(cat, cmd), "Edit").pack(
-            side="left", padx=3
-        )
-        self._icon_button(actions, "⧉", lambda cat=category, cmd=command: self.clone_command(cat, cmd), "Clone").pack(
-            side="left", padx=3
-        )
-        self._icon_button(
+        edit_button = self._icon_button(actions, action_symbol("edit"), lambda cat=category, cmd=command: self.open_editor(cat, cmd), "Edit")
+        edit_button.pack(side="left", padx=3)
+
+        clone_button = self._icon_button(actions, action_symbol("clone"), lambda cat=category, cmd=command: self.clone_command(cat, cmd), "Clone")
+        clone_button.pack(side="left", padx=3)
+
+        output_button = self._icon_button(
             actions,
-            "⌁",
+            action_symbol("output"),
             lambda cmd=command: self.output_manager.show(cmd),
             "Output",
             disabled=command.open_in_terminal,
-        ).pack(side="left", padx=3)
-        self._icon_button(
+        )
+        output_button.pack(side="left", padx=3)
+
+        delete_button = self._icon_button(
             actions,
-            "✕",
+            action_symbol("delete"),
             lambda cat=category, cmd=command: self.delete_command(cat, cmd),
             "Delete",
             danger=True,
-        ).pack(side="right", padx=3)
+        )
+        delete_button.pack(side="right", padx=3)
+
+        Tooltip(edit_button, "Edit command")
+        Tooltip(clone_button, "Clone command")
+        Tooltip(output_button, "View output" if not command.open_in_terminal else "Output unavailable for terminal mode")
+        Tooltip(delete_button, "Delete command")
 
     def _icon_button(
         self,
