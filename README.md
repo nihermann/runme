@@ -45,6 +45,26 @@ Notes:
 - On Linux, you can install the built binary system-wide yourself or wrap it in a `.deb`, `.rpm`, AppImage, or Flatpak if you want a distro-native installer.
 - On macOS, you can copy `dist/RunMe.app` into `/Applications`. If you want a signed distributable app, you still need to codesign and notarize it.
 
+## Install On Linux
+
+After building on Linux:
+
+```bash
+pyinstaller runme-desktop.spec
+bash install_linux.sh
+```
+
+The install script will:
+
+- Copy `dist/RunMe/` to `~/.local/opt/runme`
+- Create a desktop launcher at `~/.local/share/applications/runme.desktop`
+- Create a CLI symlink at `~/.local/bin/runme`
+
+Important:
+
+- Keep the full PyInstaller output directory together; do not copy only the `RunMe` binary.
+- Ensure `~/.local/bin` is on your `PATH` if you want to launch it as `runme`.
+
 ## Features
 
 - Create categories
