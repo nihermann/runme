@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Packaging / build
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# PyInstaller
+*.spec.tmp
+/build/
+/dist/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# IDE / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Local app state
+.runme-desktop/

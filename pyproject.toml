@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "runme-desktop"
+version = "0.1.0"
+description = "Simple desktop launcher for reusable shell commands."
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.0"]
+
+[project.scripts]
+runme-desktop = "runme.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+runme = ["data/*.png"]
