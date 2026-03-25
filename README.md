@@ -36,7 +36,7 @@ pyinstaller runme-desktop.spec
 Results:
 
 - macOS: `dist/RunMe.app`
-- Linux: `dist/RunMe/RunMe`
+- Linux: `dist/RunMe`
 
 Notes:
 
@@ -56,13 +56,13 @@ bash install_linux.sh
 
 The install script will:
 
-- Copy `dist/RunMe/` to `~/.local/opt/runme`
+- Copy the built app into `~/.local/opt/runme`
 - Create a desktop launcher at `~/.local/share/applications/runme.desktop`
 - Create a CLI symlink at `~/.local/bin/runme`
 
 Important:
 
-- Keep the full PyInstaller output directory together; do not copy only the `RunMe` binary.
+- The current Linux build is a single executable at `dist/RunMe`; the install script also supports an onedir layout if you switch the PyInstaller spec later.
 - Ensure `~/.local/bin` is on your `PATH` if you want to launch it as `runme`.
 
 ## Features
